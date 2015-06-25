@@ -141,40 +141,19 @@ function sell_media_gallery( $post_id ) {
     $html = '';
     if ( sell_media_has_multiple_attachments( $post_id ) ) {
 
-        /**
-         * We pass the attachment id as a query var
-         * So if it exists, we show the attachment image
-         */
-        $attachment_id = get_query_var( 'id' );
-        if ( ! empty( $attachment_id ) && sell_media_post_exists( $attachment_id ) ) {
-            $html .= sell_media_item_icon( $attachment_id, 'large', false );
-            $html .= '<p class="sell-media-caption">';
-            $html .= '<span class="sell-media-title">' . sell_media_get_attachment_meta( $post_id, 'title' ) . '</span>';
-            if ( sell_media_get_attachment_meta( $post_id, 'caption' ) ) {
-                $html .= ' &mdash; ';
-                $html .= sell_media_get_attachment_meta( $post_id, 'caption' );
-            }
-            $html .= '</p>';
-        }
-        /**
-         * If the query var doesn't exist,
-         * show the gallery grid view
-         */
-        else {
-            $attachment_ids = sell_media_get_attachments ( $post_id );
-            $html .= '<div id="sell-media-gallery-' . $post_id . '" class="sell-media-gallery sell-media-gallery-' . $post_id . '">';
-            if ( $attachment_ids ) foreach ( $attachment_ids as $attachment_id ) {
-                $attr = array(
-                    'class' => 'sell-media-gallery-image sell_media_image'
-                );
-                $html .= '<div class="sell-media-gallery-item">';
-                $html .= '<a href="' . esc_url( add_query_arg( 'id', $attachment_id, get_permalink() ) ) . '">';
-                $html .= wp_get_attachment_image( $attachment_id, 'medium', '', $attr );
-                $html .= '</a>';
-                $html .= '</div>';
-            }
+        $attachment_ids = sell_media_get_attachments ( $post_id );
+        $html .= '<div id="sell-media-gallery-' . $post_id . '" class="sell-media-gallery sell-media-gallery-' . $post_id . '">';
+        if ( $attachment_ids ) foreach ( $attachment_ids as $attachment_id ) {
+            $attr = array(
+                'class' => 'sell-media-gallery-image sell_media_image'
+            );
+            $html .= '<div class="sell-media-gallery-item">';
+            $html .= '<a href="' . esc_url( add_query_arg( 'id', $post_id, get_permalink( $attachment_id ) ) ) . '">';
+            $html .= wp_get_attachment_image( $attachment_id, 'medium', '', $attr );
+            $html .= '</a>';
             $html .= '</div>';
         }
+        $html .= '</div>';
     }
     return apply_filters( 'sell_media_gallery', $html, $post_id );
 }
@@ -394,7 +373,7 @@ function sell_media_breadcrumbs( $post_id ){
     if ( isset( $settings->breadcrumbs ) && $settings->breadcrumbs ) {
         $obj = get_post_type_object( 'sell_media_item' );
 
-        $html = '<div class="sell-media-breadcrumbs">';
+        $html = '<span class="sell-media-breadcrumbs">';
         $html .= '<a href="' . get_post_type_archive_link( 'sell_media_item' ) . '">' . $obj->rewrite['slug'] . '</a>';
         $html .= ' <span class="sell-media-breadcrumbs-sep">&raquo;</span> ';
         if ( wp_get_post_terms( $post_id, 'collection' ) ) {
@@ -406,11 +385,11 @@ function sell_media_breadcrumbs( $post_id ){
             $html .= '<a href="' . get_permalink() . '">' . get_the_title( '', false ) . '</a>';
             $html .= ' <span class="sell-media-breadcrumbs-sep">&raquo;</span> ';
             $html .= $attachment_meta['title'];
-            $html .= sell_media_gallery_navigation( get_query_var( 'id' ) );
+            //$html .= sell_media_gallery_navigation( get_query_var( 'id' ) );
         } else {
             $html .= get_the_title( '', false );
         }
-        $html .= '</div>';
+        $html .= '</span>';
 
         return apply_filters( 'sell_media_breadcrumbs', $html );
     }
@@ -436,6 +415,15 @@ function sell_media_get_cat_post_count( $category_id, $taxonomy='collection' ) {
     return $count;
 }
 
+
+function sell_media_title( $title, $id ) {
+    if ( 'sell_media_item' == get_post_type( $id ) || 'sell_media_item' == get_post_type( $id ) && get_query_var( 'id' ) ) {
+        $title = sell_media_breadcrumbs( $id );
+    }
+    return $title;
+}
+add_filter( 'the_title', 'sell_media_title', 10, 2 );
+
 /**
  * Filter the_content for sell_media_item post types
  * and add an action before the content so we can do stuff.
@@ -451,7 +439,11 @@ function sell_media_before_content( $content ) {
     $new_content = '';
     $sell_media_taxonomies = get_object_taxonomies( 'sell_media_item' );
 
-    if ( $post && $post->post_type == 'sell_media_item' && is_main_query() && ! post_password_required() ) {
+    if ( ! $post ) {
+        return;
+    }
+
+    if ( ( $post->post_type == 'sell_media_item' && is_main_query() && ! post_password_required() ) || ( $post->post_type == 'attachment' && get_query_var( 'id' ) ) ) {
         ob_start();
         $new_content .= do_action( 'sell_media_before_content', $post->ID );
         if ( is_post_type_archive( 'sell_media_item' ) || is_tax( $sell_media_taxonomies ) ) {
@@ -472,7 +464,7 @@ function sell_media_before_content( $content ) {
 
     return $content;
 }
-add_filter( 'the_content', 'sell_media_before_content' );
+//add_filter( 'the_content', 'sell_media_before_content' );
 
 /**
  * Filter the_content on single templates for sell_media_item post types
